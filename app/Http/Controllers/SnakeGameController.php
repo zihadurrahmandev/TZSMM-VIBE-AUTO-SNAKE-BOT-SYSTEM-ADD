@@ -62,21 +62,21 @@ class SnakeGameController extends Controller
 
                     if ($isBotGame) {
                         $user = User::find($game->player_1);
-                        $isUserWinner = $data['winner'] === 'user';
+                        $isUserWinner = $data['winner'] == $game->player_1_api_id;
 
                         if ($isUserWinner && $user) {
                             $user->increment('winning_balance', $game->winning);
                             Transaction::create([
                                 'user_id' => $user->id,
                                 'type' => 'credit',
-                                'action' => 'Won Snake Bot Match #' . $game->id,
+                                'action' => 'Won Snake And Ladders Match #' . $game->id,
                                 'amount' => $game->winning,
                                 'extra' => json_encode(['game_id' => $game->id, 'game' => 'snake']),
                             ]);
 
                             if ($user->one_signal) {
-                                $msg = "🎉 You beat the bot in Snake Match #{$game->id}!\nWinnings: BDT " . number_format($game->winning, 2);
-                                OneSignalService::sendNotification('Victory!', $msg, $user->one_signal);
+                                $msg = "🎉 Congrats {$user->name}, you won Snake Match # #{$game->id}!\nWinnings: BDT " . number_format($game->winning, 2);
+                                OneSignalService::sendNotification('You Won!', $msg, $user->one_signal);
                             }
 
                             $game->update([
@@ -86,8 +86,8 @@ class SnakeGameController extends Controller
                             ]);
                         } elseif ($user) {
                             if ($user->one_signal) {
-                                $msg = "😢 Bot won your Snake Match #{$game->id}. Try again!";
-                                OneSignalService::sendNotification('Bot Wins', $msg, $user->one_signal);
+                                $msg = "💔 You lost Snake Match # #{$game->id}. Try again!";
+                                OneSignalService::sendNotification('Match Result', $msg, $user->one_signal);
                             }
 
                             $game->update([
@@ -459,6 +459,7 @@ class SnakeGameController extends Controller
 
                     Log::info("Snake bot match created for player {$queue->user_id} with game ID {$apiData['game_id']} for game_type_id {$queue->game_type_id}, bot_winner: {$isBotWinner}");
                     $queue->delete();
+                    $gameType->delete();
                 } else {
                     Log::error("Snake Bot API call failed for game_type_id {$queue->game_type_id}: " . $apiResponse->body());
                 }
@@ -753,7 +754,7 @@ class SnakeGameController extends Controller
                 'status' => 'waiting',
                 'created_at' => $type->created_at->toDateTimeString(),
                 'joined' => $alreadyJoined,
-                'redirect_url' =>  null,
+                'redirect_url' => $alreadyJoined ? route('games.snake.waiting', $type->id) : null,
             ];
         }
 
